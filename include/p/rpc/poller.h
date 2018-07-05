@@ -19,8 +19,6 @@ public:
   // return epoll_wait wakeup timestamp_us point
   int64_t poll();
 
-  //int stop();
-
   int add_socket(Socket* s, bool out);
 
   int mod_socket(Socket* s, bool add);

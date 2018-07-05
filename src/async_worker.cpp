@@ -3,6 +3,7 @@
 
 #include "p/rpc/async_worker.h"
 
+#include "p/base/logging.h"
 #include "p/base/time.h"
 
 namespace p {
@@ -23,15 +24,23 @@ bool AsyncWorker::in_worker_thread() {
 
 void AsyncWorker::start() {
     is_running_ = true;
-    poller_.add_socket(&timer_, false);
     this_thread_ = std::thread(&AsyncWorker::worker_running, this);
 }
 
-void AsyncWorker::stop() {
-    if (is_running_) {
-        is_running_ = false;
-        timer_.wakeup_now();
+int AsyncWorker::join() {
+    if (this_thread_.joinable()) {
+        this_thread_.join();
+        return 0;
     }
+    return -1;
+}
+
+void AsyncWorker::stop_func() {
+    is_running_ = false;
+}
+
+void AsyncWorker::stop() {
+    push_message(&AsyncWorker::stop_func, this);
 }
 
 void AsyncWorker::worker_running() {
@@ -40,8 +49,11 @@ void AsyncWorker::worker_running() {
 
     int64_t wakeup_timestamp_us = 0;
     while (is_running_) {
+        run_message();
+
         // do polling
-        wakeup_timestamp_us = poller_.poll();
+        wakeup_timestamp_us = poll();
+
         // do all pendding async message
         run_message();
 
@@ -60,8 +72,9 @@ void AsyncWorker::run_message() {
     }
 
     for (auto& message : swaped_queue_) {
-        message.function_(message.object_);
+        message.function(message.object);
     }
+
     swaped_queue_.clear();
 }
 
@@ -71,7 +84,14 @@ void AsyncWorker::push_message(AsyncMessage::Func func, void* object) {
         std::unique_lock<std::mutex> lock_gaurd(mutex_);
         queue_.push_back(msg);
     }
-    timer_.wakeup_now();
+}
+
+void AsyncWorker::insert_message(AsyncMessage::Func func, void* object) {
+    AsyncMessage msg{func, object};
+    {
+        std::unique_lock<std::mutex> lock_gaurd(mutex_);
+        queue_.push_front(msg);
+    }
 }
 
 } // end namespace rpc

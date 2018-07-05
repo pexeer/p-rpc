@@ -6,6 +6,7 @@
 #include <unordered_set>
 
 #include "p/rpc/socket.h"       // Socket
+#include "p/rpc/async_worker.h"       // AsyncWorker
 
 namespace p {
 namespace rpc {
@@ -14,36 +15,39 @@ class AsyncWorker;
 
 class Acceptor : public Socket {
 public:
-    typedef Socket* (*SocketGeneratorFunc)(void);
-
-public:
     Acceptor(AsyncWorker* worker);
 
-    int listen(const base::EndPoint& ep) {
-        local_side_ = ep;
-        return fd_.Listen(local_side_);
-    }
+    ~Acceptor() {}
+
+    int listen(const base::EndPoint& ep);
+
+    virtual Socket* new_socket() = 0;
 
     Socket* accept();
 
+private:
     int stop();
 
     int join(bool wait_doing);
-
-    void set_socket_generaotr(SocketGeneratorFunc f) {
-        socket_generaotr_ = f;
-    }
 
     void add_socket(Socket* s);
 
     void del_socket(Socket* s);
 
-protected:
+    virtual void on_msg_in();
+
+    virtual void on_msg_read(char* buf, size_t len) {}
+
+    virtual void on_msg_sended(const char* buf, int64_t len, void* arg) {}
+
+    virtual void on_send_failed(const char* buf, int64_t len, void* arg) {}
+
+    friend class AsyncWorker;
+
     AsyncWorker*                   worker_;
-    SocketGeneratorFunc            socket_generaotr_;
+
     std::unordered_set<Socket*>    socket_map_;
     int32_t                        idle_timeout_sec_;
-    Socket*                        new_socket_ = nullptr;
 };
 
 } // end namespace rpc

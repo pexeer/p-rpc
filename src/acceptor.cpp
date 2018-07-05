@@ -7,17 +7,22 @@
 namespace p {
 namespace rpc {
 
-static void on_read_msg(void* arg) {
-    Acceptor* acceptor  = (Acceptor*)arg;
-
-    while (acceptor->accept()) {
-        ;
-    }
+Acceptor::Acceptor(AsyncWorker* worker) : worker_(worker) {
 }
 
-Acceptor::Acceptor(AsyncWorker* worker) : worker_(worker) {
-    on_read_msg_ = &on_read_msg;
-    on_write_msg_ = nullptr;
+int Acceptor::listen(const base::EndPoint& ep) {
+    local_side_ = ep;
+    int ret = Listen(local_side_);
+
+    LOG_INFO << this << " listen on " << ep << " :" << strerror(ret);
+
+    if (ret) {
+        return ret;
+    }
+
+    worker_->add_socket(this, false);
+
+    return 0;
 }
 
 Socket* Acceptor::accept() {
@@ -28,29 +33,32 @@ Socket* Acceptor::accept() {
     new_fd = ::accept4(fd(), &new_addr, &addrlen, SOCK_NONBLOCK | SOCK_CLOEXEC);
 
     if (new_fd < 0) {
-        if (errno != EAGAIN) {
-            // Delay
-            worker_->push_message(&on_read_msg, this);
-        }
         return nullptr;
     }
 
-    new_socket_->fd_.reset(new_fd);
-    new_socket_->local_side_ = local_side_;
-    new_socket_->remote_side_ = base::EndPoint((struct sockaddr_in*)&new_addr);
+    Socket* ret = new_socket();
+    ret->reset(new_fd);
+    ret->set_local_side(local_side_);
+    ret->set_remote_side(base::EndPoint((struct sockaddr_in*)&new_addr));
 
-    add_socket(new_socket_);
+    add_socket(ret);
 
-    Socket* ret = new_socket_;
-    new_socket_ = socket_generaotr_();
     return ret;
 }
 
+void Acceptor::on_msg_in() {
+    while (accept()) {
+        ;
+    }
+}
+
 void Acceptor::add_socket(Socket* s) {
+    worker_->add_socket(s, true);
     socket_map_.insert(s);
 }
 
 void Acceptor::del_socket(Socket* s) {
+    worker_->del_socket(s);
     socket_map_.erase(s);
 }
 

@@ -17,9 +17,8 @@ namespace rpc {
 Poller::Poller() {
     poll_fd_ = ::epoll_create(/*ignore*/ 102400);
     if (poll_fd_ < 0) {
-        LOG_FATAL << "Poller create epoll failed for " << strerror(errno);
+        LOG_FATAL << this << " Poller create epoll failed for " << strerror(errno);
     }
-
 }
 
 Poller::~Poller() {
@@ -28,30 +27,25 @@ Poller::~Poller() {
     }
 }
 
-/*
-int Poller::stop() {
-    if (poll_fd_ <= 0) {
-        return -1;
-    }
-    return 0;
-}
-*/
-
 int64_t Poller::poll() {
     const int kMaxEventNum = 2048;
     struct epoll_event evts[kMaxEventNum];
 
+    LOG_INFO << this << " Poller epoll_wait begin";
     const int n = ::epoll_wait(poll_fd_, evts, kMaxEventNum, -1);
     int64_t wakeup_timestamp_us = base::gettimeofday_us();
-    LOG_INFO << "Poller epoll_wait return " << n;
+    LOG_INFO << this << " Poller epoll_wait return " << n;
 
     for (int i = 0; i< n; ++i) {
         Socket* s = (Socket*)(evts[i].data.u64);
 
         if (evts[i].events & (EPOLLOUT | EPOLLERR | EPOLLHUP)) {
-            s->on_write_msg_(s);
-        } else {
-            s->on_read_msg_(s);
+            LOG_DEBUG << this << " Poller do on_msg_out " << s;
+            s->on_msg_out();
+        }
+        if (evts[i].events & (EPOLLIN | EPOLLERR | EPOLLHUP)) {
+            LOG_DEBUG << this << " Poller do on_msg_in" << s;
+            s->on_msg_in();
         }
     }
 
@@ -68,6 +62,8 @@ int Poller::add_socket(Socket* s, bool out) {
         evt.events |= EPOLLOUT;
     }
 
+    LOG_DEBUG << this << " Poller add_socket " << s << " out " << out;
+
     return ::epoll_ctl(poll_fd_, EPOLL_CTL_ADD, s->fd(), &evt);
 }
 
@@ -80,6 +76,7 @@ int Poller::mod_socket(Socket* s, bool add) {
         evt.events |= EPOLLOUT;
     }
 
+    LOG_DEBUG << this << " Poller mod_socket " << s << " add " << add;
     return ::epoll_ctl(poll_fd_, EPOLL_CTL_MOD, s->fd(), &evt);
 }
 

@@ -5,7 +5,7 @@
 
 #include "p/base/macros.h"          // P_DISALLOW_COPY
 #include "p/base/socket.h"          // SocketFd
-#include "p/rpc/async_message.h"    // AsyncMessage
+#include <deque>
 
 namespace p {
 namespace rpc {
@@ -14,11 +14,15 @@ class SocketUser;
 
 class SocketPtr;
 
-class Socket {
+class Socket : public base::SocketFd {
 public:
     Socket() {}
 
+    Socket(int fd) : SocketFd(fd) {}
+
     virtual ~Socket() {}
+
+    int connect(base::EndPoint peer);
 
     base::EndPoint remote_side() const {
         return remote_side_;
@@ -28,33 +32,60 @@ public:
         return local_side_;
     }
 
-    ssize_t write(const void *buf, size_t count) { return fd_.Write(buf, count); }
+    virtual void on_msg_read(char* buf, size_t len) = 0;
 
-    ssize_t read(void *buf, size_t count) { return fd_.Read(buf, count); }
+    virtual void on_msg_sended(const char* buf, int64_t len, void* arg) = 0;
 
-    int fd() const {
-        return fd_.fd();
+    virtual void on_send_failed(const char* buf, int64_t len, void* arg) = 0;
+
+    int set_failed(int err);
+
+    int send_msg(const char* buf, size_t len, void* arg);
+
+    void stop_read() {
+        reading_msg_ = 0;
     }
 
-public:
-    friend class Poller;
-    friend class Acceptor;
+    void try_read() {
+        reading_msg_  = 1;
+        on_msg_in();
+    }
+
+    int shutdown();
+
+    virtual void on_msg_in();
+
+    void on_msg_out();
+
+    struct SendCtx {
+        const char*   buf;
+        size_t  len;
+        void*   arg;
+    };
+
     friend class SocketPtr;
 
+    void set_local_side(base::EndPoint peer) {
+        local_side_ = peer;
+    }
+
+    void set_remote_side(base::EndPoint peer) {
+        remote_side_ = peer;
+    }
+
 protected:
-    p::base::SocketFd       fd_;
-    int                     errno_ = 0;
-    AsyncMessage::Func      on_write_msg_;
-    AsyncMessage::Func      on_read_msg_;
     base::EndPoint          remote_side_;
     base::EndPoint          local_side_;
 
-    SocketUser*             user_  = nullptr;
+    int                     errno_ = 0;
+    int                     reading_msg_ = 1;
+
+    std::atomic<int64_t>    sending_lock_ = {0};
+    const char*                   sending_buf_ = nullptr;
+    ssize_t                 sending_left_ = 0;
+    std::deque<SendCtx>     sending_queue_;
 
     std::atomic<int64_t>    ref_ = {0};
-
-private:
-    P_DISALLOW_COPY(Socket);
 };
 
 class SocketPtr {
