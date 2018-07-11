@@ -70,7 +70,7 @@ private:
 
 
   std::unordered_map<int64_t, Socket*>    socket_map_;
-  int32_t                        idle_timeout_sec_;
+  //int32_t                        idle_timeout_sec_;
 private:
   P_DISALLOW_COPY(AsyncWorker);
 };

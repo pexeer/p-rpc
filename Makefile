@@ -8,8 +8,8 @@ DEBUG=-g3
 #OPT=-O2
 BUILD_DIR ?= ./build
 SRC_DIRS ?= ./src
-#CC=clang
-#CXX=clang++
+CC=clang
+CXX=clang++
 
 SRCS := $(shell find $(SRC_DIRS) -name \*.cpp -or -name \*.c -or -name \*.S)
 OBJS := $(SRCS:%=$(BUILD_DIR)/%.o)
@@ -18,7 +18,7 @@ INC_DIRS := $(shell find $(SRC_DIRS) -type d)
 INC_FLAGS := $(shell for subdir in $(INC_DIRS);do mkdir -p $(BUILD_DIR)/$${subdir}; done)
 INC_FLAGS := $(addprefix -I,$(INC_DIRS))
 #CPPFLAGS=-I./include -MMD -MP
-CPPFLAGS=-I./include -I../base/include/
+CPPFLAGS=-I./include -I../base/include/ -I../3rd/installed/include/
 FINAL_ASFLAGS=$(ASFLAGS)
 FINAL_CFLAGS=$(WARNING) $(OPT) $(DEBUG) $(CFLAGS) $(CPPFLAGS)
 FINAL_CXXFLAGS=$(STD) $(WARNING) $(OPT) $(DEBUG) $(CPPFLAGS) $(CXXFLAGS) $(CFLAGS)
@@ -66,7 +66,7 @@ $(BUILD_DIR)/%.cpp.o: %.cpp
 	$(P_CXX) -c $< -o $@
 
 # exe binary
-%.exe: $(BUILD_DIR)/%.cpp.o $(BUILD_DIR)/p-rpc.a ../base/build/p-base.a
+%.exe: $(BUILD_DIR)/%.cpp.o $(BUILD_DIR)/p-rpc.a ../base/build/p-base.a ../3rd/installed/lib/libcryptopp.a
 	$(P_LINK) $^ -o $@
 
 clean:

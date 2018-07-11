@@ -5,8 +5,8 @@
 
 #include <unordered_set>
 
-#include "p/rpc/socket.h"       // Socket
-#include "p/rpc/async_worker.h"       // AsyncWorker
+#include "p/rpc/socket.h"           // Socket
+#include "p/rpc/async_worker.h"     // AsyncWorker
 
 namespace p {
 namespace rpc {
@@ -36,11 +36,11 @@ private:
 
     virtual void on_msg_in();
 
-    virtual void on_msg_read(char* buf, size_t len) {}
+    virtual void on_msg_read(base::ZBuffer* ref) {}
 
-    virtual void on_msg_sended(const char* buf, int64_t len, void* arg) {}
+    virtual void on_msg_sended(int err, void* arg) {}
 
-    virtual void on_send_failed(const char* buf, int64_t len, void* arg) {}
+    virtual void on_failed() {}
 
     friend class AsyncWorker;
 

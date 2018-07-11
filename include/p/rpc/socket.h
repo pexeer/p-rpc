@@ -5,6 +5,7 @@
 
 #include "p/base/macros.h"          // P_DISALLOW_COPY
 #include "p/base/socket.h"          // SocketFd
+#include "p/base/zbuffer.h"         // ZBuffer
 #include <deque>
 
 namespace p {
@@ -32,15 +33,15 @@ public:
         return local_side_;
     }
 
-    virtual void on_msg_read(char* buf, size_t len) = 0;
+    virtual void on_msg_read(base::ZBuffer* ref) = 0;
 
-    virtual void on_msg_sended(const char* buf, int64_t len, void* arg) = 0;
+    virtual void on_msg_sended(int err, void* arg) = 0;
 
-    virtual void on_send_failed(const char* buf, int64_t len, void* arg) = 0;
+    virtual void on_failed() = 0;
 
     int set_failed(int err);
 
-    int send_msg(const char* buf, size_t len, void* arg);
+    int send_msg(base::ZBuffer&& zbuf, void* arg);
 
     void stop_read() {
         reading_msg_ = 0;
@@ -58,9 +59,9 @@ public:
     void on_msg_out();
 
     struct SendCtx {
-        const char*   buf;
-        size_t  len;
-        void*   arg;
+        uint32_t offset;
+        uint32_t length;
+        void     *arg;
     };
 
     friend class SocketPtr;
@@ -80,10 +81,8 @@ protected:
     int                     errno_ = 0;
     int                     reading_msg_ = 1;
 
-    std::atomic<int64_t>    sending_lock_ = {0};
-    const char*                   sending_buf_ = nullptr;
-    ssize_t                 sending_left_ = 0;
-    std::deque<SendCtx>     sending_queue_;
+    std::atomic<int64_t>            sending_lock_ = {0};
+    std::deque<base::ZBuffer::BlockRef>     sending_queue_;
 
     std::atomic<int64_t>    ref_ = {0};
 };

@@ -1,39 +1,12 @@
-#include <stdio.h>
-#include <unistd.h>
 
-#include "p/rpc/async_worker.h"
-#include "p/rpc/acceptor.h"
+#include "shadowsocket.h"
 
-class MySocket : public p::rpc::Socket {
+class ShadowAcceptor : public p::rpc::Acceptor {
 public:
-    virtual void on_msg_read(char* buf, size_t len) {
-        LOG_DEBUG << this << " on read len=" << len << " :" << buf;
-        if (buf == nullptr) {
-            eof_ = true;
-        }
-        send_msg("hello,world\r\n", 13, nullptr);
-    }
-
-    virtual void on_msg_sended(const char* buf, int64_t len, void* arg) {
-        LOG_DEBUG << this << " on writed len=" << len << " :" << buf;
-        if (eof_) {
-            shutdown();
-        }
-    }
-
-    virtual void on_send_failed(const char* buf, int64_t len, void* arg) {
-        LOG_DEBUG << this << " on failed";
-    }
-
-    bool eof_ = false;
-};
-
-class MyAcceptor : public p::rpc::Acceptor {
-public:
-    MyAcceptor(p::rpc::AsyncWorker* work) : Acceptor(work) {}
+    ShadowAcceptor(p::rpc::AsyncWorker* work) : Acceptor(work) {}
 
     virtual p::rpc::Socket* new_socket() {
-        return new MySocket();
+        return new ShadowSocket();
     }
 };
 
@@ -41,12 +14,12 @@ void x(void* arg) {
     LOG_DEBUG<< "message run chenzjiga " << (char*)arg;
 }
 
-int main() {
+int main(int argc, char* argv[]) {
     p::rpc::AsyncWorker worker;
 
-    MyAcceptor ac(&worker);
+    ShadowAcceptor ac(&worker);
 
-    int ret = ac.listen(p::base::EndPoint("127.0.0.1:8001"));
+    int ret = ac.listen(p::base::EndPoint(argv[1]));
 
     LOG_DEBUG << "listen ret=" << ret;
 

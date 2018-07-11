@@ -7,21 +7,16 @@
 namespace p {
 namespace rpc {
 
-const size_t kMaxReadingBufferSize = 1024 * 1024;
-
-int Socket::send_msg(const char* buf, size_t len, void* arg) {
+int Socket::send_msg(base::ZBuffer&& zbuf, void* arg) {
     if (errno_) {
         return -1;
     }
 
-    SendCtx ctx = {buf, len, arg};
-    sending_queue_.push_back(ctx);
+    zbuf.dump(&sending_queue_);
 
-    if (sending_queue_.size() == 1) {
-        sending_buf_ = ctx.buf;
-        sending_left_ = ctx.len;
-        on_msg_out();
-    }
+    sending_queue_.push_back(base::ZBuffer::BlockRef{0, 0, (base::ZBuffer::Block*)arg});
+
+    on_msg_out();
 
     return 0;
 }
@@ -42,11 +37,13 @@ int Socket::set_failed(int err) {
     }
 
     errno_ = err;
-    sending_buf_ = nullptr;
-    sending_left_ = 0;
 
-    for (auto& ctx : sending_queue_) {
-        on_send_failed(ctx.buf, ctx.len, ctx.arg);
+    for (auto& ref : sending_queue_) {
+        if (ref.length) {
+            ref.release();
+        } else {
+            on_msg_sended(errno_, (void*)ref.block);
+        }
     }
     sending_queue_.clear();
     return 0;
@@ -57,13 +54,13 @@ void Socket::on_msg_in() {
         return ;
     }
 
-    char buf[kMaxReadingBufferSize];
-
     while (true) {
-        ssize_t ret = Read(buf, sizeof(buf));
+        base::ZBuffer   zbuf;
+
+        ssize_t ret = zbuf.read_from_fd(fd_, -1, 512 * 1024);
 
         if (ret > 0) {
-            on_msg_read(buf, ret);
+            on_msg_read(&zbuf);
             continue;
         }
 
@@ -74,10 +71,8 @@ void Socket::on_msg_in() {
             set_failed(errno);
         }
 
-        // ret == 0, set EOF
-        //try_close();
         LOG_DEBUG << this << " Socket set EOF";
-        on_msg_read(nullptr, 0);
+        on_msg_read(nullptr);
         break;
     }
 }
@@ -89,21 +84,21 @@ void Socket::on_msg_out() {
      //   return ;
     //}
 
-    while (sending_buf_) {
-        ssize_t ret = Write(sending_buf_, sending_left_);
+    while (!sending_queue_.empty()) {
+        auto &ref = sending_queue_.front();
+        if (ref.length == 0) {
+            on_msg_sended(0, (void*)ref.block);
+            sending_queue_.pop_front();
+            continue;
+        }
+
+        ssize_t ret = Write(ref.begin(), ref.length);
         if (ret > 0) {
-            sending_buf_ += ret;
-            sending_left_ -= ret;
-            if (sending_left_ == 0) {
-                sending_buf_ = nullptr;
-                SendCtx ctx = sending_queue_.front();
+            if (ref.length == ret) {
+                ref.release();
                 sending_queue_.pop_front();
-                on_msg_sended(ctx.buf, ctx.len, ctx.arg);
-                if (!sending_queue_.empty()) {
-                    ctx = sending_queue_.front();
-                    sending_buf_ = ctx.buf;
-                    sending_left_ = ctx.len;
-                }
+            } else {
+                ref.length -= ret;
             }
             continue;
         }
