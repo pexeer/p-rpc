@@ -2,9 +2,10 @@
 # Copyright (C) 2017 pexeer@gamil.com
 # Fri Jul 14 16:42:50 CST 2017
 
+#STD=-std=c++11 -fsanitize=address -fno-omit-frame-pointer
 STD=-std=c++11
 WARNING=-Wall -Werror
-DEBUG=-g3
+DEBUG=-g
 #OPT=-O2
 BUILD_DIR ?= ./build
 SRC_DIRS ?= ./src
@@ -22,6 +23,7 @@ CPPFLAGS=-I./include -I../base/include/ -I../3rd/installed/include/
 FINAL_ASFLAGS=$(ASFLAGS)
 FINAL_CFLAGS=$(WARNING) $(OPT) $(DEBUG) $(CFLAGS) $(CPPFLAGS)
 FINAL_CXXFLAGS=$(STD) $(WARNING) $(OPT) $(DEBUG) $(CPPFLAGS) $(CXXFLAGS) $(CFLAGS)
+#FINAL_LDFLAGS=$(LDFLAGS)  $(DEBUG) -fsanitize=address
 FINAL_LDFLAGS=$(LDFLAGS)  $(DEBUG)
 FINAL_LIBS=-lm -ldl -pthread
 

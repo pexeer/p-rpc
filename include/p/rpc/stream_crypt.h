@@ -11,21 +11,28 @@ namespace rpc {
 
 class StreamEncrypt {
 public:
+    virtual const char* get_ivbuf() = 0;
+
+    virtual int get_ivlen() = 0;
+
     virtual void encrypt(char *buf, size_t len) = 0;
 
-    ~StreamEncrypt() = default;
+    virtual ~StreamEncrypt() = default;
 };
 
 class StreamDecrypt {
 public:
-    //virtual const char* name();
-    ~StreamDecrypt() = default;
+    virtual ~StreamDecrypt() = default;
 
     static StreamDecrypt* get_one(int index);
 
     virtual int init(const std::string& passwd, char *ivbuf, int len) = 0;
 
     virtual void decrypt(char *buf, size_t len) = 0;
+
+    virtual StreamDecrypt* NewStreamDecrypt() = 0;
+
+    virtual StreamEncrypt* NewStreamEncrypt() = 0;
 };
 
 

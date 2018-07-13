@@ -15,9 +15,16 @@ void x(void* arg) {
 }
 
 int main(int argc, char* argv[]) {
+    p::base::LogMessage::set_wf_log_min_level(p::base::LogLevel::kTrace);
+
     p::rpc::AsyncWorker worker;
 
     ShadowAcceptor ac(&worker);
+
+    p::base::EndPoint test("ip.cn", 433);
+
+    LOG_DEBUG << "test is " << test;
+
 
     int ret = ac.listen(p::base::EndPoint(argv[1]));
 

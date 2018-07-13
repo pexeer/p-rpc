@@ -25,14 +25,14 @@ public:
 
     Socket* accept();
 
+  void insert_connect(Socket* s);
+
+  void release_connect(Socket* s);
+
 private:
     int stop();
 
     int join(bool wait_doing);
-
-    void add_socket(Socket* s);
-
-    void del_socket(Socket* s);
 
     virtual void on_msg_in();
 

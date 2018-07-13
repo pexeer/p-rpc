@@ -17,37 +17,21 @@
 #include "cryptopp/modes.h"
 #include "cryptopp/osrng.h"
 
-using CryptoPP::AutoSeededRandomPool;
-using CryptoPP::Exception;
-using CryptoPP::StringSink;
-using CryptoPP::StringSource;
-using CryptoPP::ArraySink;
-using CryptoPP::ArraySource;
-using CryptoPP::StreamTransformationFilter;
-using CryptoPP::AES;
-using CryptoPP::DES;
-using CryptoPP::Blowfish;
-using CryptoPP::CAST;
-using CryptoPP::ChaCha20;
-using CryptoPP::Salsa20;
-using CryptoPP::CFB_Mode;
-using CryptoPP::byte;
-
 namespace p {
 namespace rpc {
 
 inline void md5sum(const char* in, int inlen, char* buf) {
     CryptoPP::Weak::MD5 hash;
-    hash.CalculateDigest((byte*)buf, (const byte*)in, inlen);
+    hash.CalculateDigest((CryptoPP::byte*)buf, (const CryptoPP::byte*)in, inlen);
 }
 
 // make sure keyLen is multi of 16
-void BuildKeyFromPassword(const std::string& password, char *key, int keyLen) {
+void BuildKeyFromPassword(const std::string& password, char* key, int keyLen) {
     constexpr int kMD5Len = 16;
 
-    int buf_len = password.size() + kMD5Len;
+    int         buf_len = password.size() + kMD5Len;
     std::string tmp_buf(buf_len, '\0');
-    char* buf = &tmp_buf[0];
+    char*       buf = &tmp_buf[0];
     ::memcpy(buf + kMD5Len, (const void*)password.data(), password.size());
 
     md5sum(buf + kMD5Len, password.size(), key);
@@ -60,8 +44,37 @@ void BuildKeyFromPassword(const std::string& password, char *key, int keyLen) {
     }
 }
 
-template <typename T, const int keyLen, const int ivLen>
-class Decrypter : public StreamDecrypt {
+template <typename T, const int keyLen, const int ivLen> class Encrypter : public StreamEncrypt {
+public:
+    Encrypter(CryptoPP::byte* key) {
+        ::memcpy(key_, key, keyLen);
+        CryptoPP::AutoSeededRandomPool prng;
+        prng.GenerateBlock(ivbuf_, ivLen);
+        enc_.SetKeyWithIV(key_, keyLen, ivbuf_, ivLen);
+    }
+
+    const char* get_ivbuf() override { return (const char*)ivbuf_; }
+
+    int get_ivlen() override { return ivLen; }
+
+    void encrypt(char* buf, size_t len) override {
+        CryptoPP::ArraySource((const CryptoPP::byte*)buf, len, true,
+                              new CryptoPP::StreamTransformationFilter(
+                                  enc_, new CryptoPP::ArraySink((CryptoPP::byte*)buf, len)));
+    }
+
+private:
+    CryptoPP::byte         key_[32];
+    CryptoPP::byte         ivbuf_[32];
+    typename T::Encryption enc_;
+};
+
+template <typename T, const int keyLen, const int ivLen> class Decrypter : public StreamDecrypt {
+public:
+    Decrypter() {}
+
+    Decrypter(CryptoPP::byte* key) { ::memcpy(key_, key, keyLen); }
+
     int init(const std::string& passwd, char* ivbuf, int len) override {
         static_assert(keyLen <= 32 && (keyLen % 16 == 0), "error key length");
 
@@ -69,29 +82,36 @@ class Decrypter : public StreamDecrypt {
             return -1;
         }
 
-        BuildKeyFromPassword(passwd, key_, keyLen);
-        dec_.SetKeyWithIV((const byte*)key_, keyLen, (const byte*)ivbuf, ivLen);
+        BuildKeyFromPassword(passwd, (char*)key_, keyLen);
+
+        dec_.SetKeyWithIV(key_, keyLen, (const CryptoPP::byte*)ivbuf, ivLen);
 
         return ivLen;
     }
 
+    void decrypt(char* buf, size_t len) override {
+        CryptoPP::ArraySource((const CryptoPP::byte*)buf, len, true,
+                              new CryptoPP::StreamTransformationFilter(
+                                  dec_, new CryptoPP::ArraySink((CryptoPP::byte*)buf, len)));
+    }
 
+    virtual StreamDecrypt* NewStreamDecrypt() override {
+        return new Decrypter<T, keyLen, ivLen>(&key_[0]);
+    }
 
-    void decrypt(char *buf, size_t len) override {
-        CryptoPP::ArraySource((const byte*)buf, len, true,
-                new StreamTransformationFilter(dec_, new ArraySink((byte *)buf, len)));
+    virtual StreamEncrypt* NewStreamEncrypt() override {
+        return new Encrypter<T, keyLen, ivLen>(&key_[0]);
     }
 
 private:
-    char     key_[32];
+    CryptoPP::byte         key_[32];
     typename T::Decryption dec_;
 };
 
-typedef Decrypter<CFB_Mode<AES>, 16, 16> DecrypterAES_16_16;
-typedef Decrypter<CFB_Mode<AES>, 32, 16> DecrypterAES_32_16;
-typedef Decrypter<ChaCha20, 32, 8> DecrypterChaCha_32_8;
-typedef Decrypter<Salsa20, 32, 8> DecrypterSalsa20_32_8;
-
+typedef Decrypter<CryptoPP::CFB_Mode<CryptoPP::AES>, 16, 16> DecrypterAES_16_16;
+typedef Decrypter<CryptoPP::CFB_Mode<CryptoPP::AES>, 32, 16> DecrypterAES_32_16;
+typedef Decrypter<CryptoPP::ChaCha20, 32, 8>                 DecrypterChaCha_32_8;
+typedef Decrypter<CryptoPP::Salsa20, 32, 8>                  DecrypterSalsa20_32_8;
 
 StreamDecrypt* StreamDecrypt::get_one(int index) {
     switch (index) {
@@ -110,8 +130,6 @@ StreamDecrypt* StreamDecrypt::get_one(int index) {
     }
     return nullptr;
 }
-
-
 
 } // end namespace rpc
 } // end namespace p

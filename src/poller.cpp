@@ -40,11 +40,11 @@ int64_t Poller::poll() {
         Socket* s = (Socket*)(evts[i].data.u64);
 
         if (evts[i].events & (EPOLLOUT | EPOLLERR | EPOLLHUP)) {
-            LOG_DEBUG << this << " Poller do on_msg_out " << s;
+            LOG_DEBUG << this << " Poller do on_msg_out Socket=" << s;
             s->on_msg_out();
         }
         if (evts[i].events & (EPOLLIN | EPOLLERR | EPOLLHUP)) {
-            LOG_DEBUG << this << " Poller do on_msg_in" << s;
+            LOG_DEBUG << this << " Poller do on_msg_in Socket=" << s;
             s->on_msg_in();
         }
     }
@@ -62,7 +62,7 @@ int Poller::add_socket(Socket* s, bool out) {
         evt.events |= EPOLLOUT;
     }
 
-    LOG_DEBUG << this << " Poller add_socket " << s << " out " << out;
+    LOG_DEBUG << this << " Poller add_socket Socket=" << s << ",out=" << out;
 
     return ::epoll_ctl(poll_fd_, EPOLL_CTL_ADD, s->fd(), &evt);
 }
@@ -76,7 +76,7 @@ int Poller::mod_socket(Socket* s, bool add) {
         evt.events |= EPOLLOUT;
     }
 
-    LOG_DEBUG << this << " Poller mod_socket " << s << " add " << add;
+    LOG_DEBUG << this << " Poller mod_socket Socket=" << s << ",add=" << add;
     return ::epoll_ctl(poll_fd_, EPOLL_CTL_MOD, s->fd(), &evt);
 }
 

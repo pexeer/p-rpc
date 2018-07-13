@@ -40,8 +40,10 @@ Socket* Acceptor::accept() {
     ret->reset(new_fd);
     ret->set_local_side(local_side_);
     ret->set_remote_side(base::EndPoint((struct sockaddr_in*)&new_addr));
+    ret->set_status(Socket::kConnected);
 
-    add_socket(ret);
+    ret->set_owner(this);
+    insert_connect(ret);
 
     return ret;
 }
@@ -52,15 +54,18 @@ void Acceptor::on_msg_in() {
     }
 }
 
-void Acceptor::add_socket(Socket* s) {
+void Acceptor::insert_connect(Socket* s) {
     worker_->add_socket(s, true);
     socket_map_.insert(s);
 }
 
-void Acceptor::del_socket(Socket* s) {
+void Acceptor::release_connect(Socket* s) {
     worker_->del_socket(s);
     socket_map_.erase(s);
+
+    worker_->push_message(&Socket::release_socket, s);
 }
+
 
 } // end namespace rpc
 } // end namespace p

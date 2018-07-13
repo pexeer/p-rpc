@@ -2,6 +2,7 @@
 // Licensed under a BSD-style license that can be found in the LICENSE file.
 
 #include "p/rpc/async_worker.h"
+#include "p/rpc/socket.h"
 
 #include "p/base/logging.h"
 #include "p/base/time.h"
@@ -10,6 +11,10 @@ namespace p {
 namespace rpc {
 
 thread_local AsyncWorker* tls_async_worker_ptr = nullptr;
+
+AsyncWorker* AsyncWorker::current_worker() {
+    return tls_async_worker_ptr;
+}
 
 AsyncWorker::~AsyncWorker() {
     stop();
@@ -93,6 +98,19 @@ void AsyncWorker::insert_message(AsyncMessage::Func func, void* object) {
         queue_.push_front(msg);
     }
 }
+
+void AsyncWorker::insert_connect(Socket* s) {
+    add_socket(s, true);
+    socket_map_.insert(s);
+}
+
+void AsyncWorker::release_connect(Socket* s) {
+    del_socket(s);
+    socket_map_.erase(s);
+
+    push_message(&Socket::release_socket, s);
+}
+
 
 } // end namespace rpc
 } // end namespace p

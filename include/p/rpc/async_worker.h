@@ -9,6 +9,7 @@
 #include <mutex>
 #include <thread>
 #include <unordered_map>
+#include <unordered_set>
 #include <deque>
 
 #include "p/rpc/poller.h"
@@ -37,6 +38,8 @@ public:
   // current thread is loop thread
   bool in_worker_thread();
 
+  static AsyncWorker* current_worker();
+
   template<typename Object>
   void push_message(void (Object::*func)(void), Object* object) {
           AsyncMessage::Func* f = (AsyncMessage::Func*)(&func);
@@ -50,6 +53,10 @@ public:
   void insert_message(AsyncMessage::Func func, void *object);
 
   void stop_func();
+
+  void insert_connect(Socket* s);
+
+  void release_connect(Socket* s);
 
 protected:
   void worker_running();
@@ -69,7 +76,7 @@ private:
   std::deque<AsyncMessage> swaped_queue_;
 
 
-  std::unordered_map<int64_t, Socket*>    socket_map_;
+  std::unordered_set<Socket*>       socket_map_;
   //int32_t                        idle_timeout_sec_;
 private:
   P_DISALLOW_COPY(AsyncWorker);
