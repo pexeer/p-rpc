@@ -15,7 +15,8 @@ void x(void* arg) {
 }
 
 int main(int argc, char* argv[]) {
-    p::base::LogMessage::set_wf_log_min_level(p::base::LogLevel::kTrace);
+    p::base::Log::set_ef_log_level(p::base::LogLevel::kTrace);
+    //p::base::g_log_level = p::base::LogLevel::kFatal;
 
     p::rpc::AsyncWorker worker;
 
@@ -25,8 +26,12 @@ int main(int argc, char* argv[]) {
 
     LOG_DEBUG << "test is " << test;
 
+    int port = 8333;
+    if (argc >= 2) {
+        port = atol(argv[1]);
+    }
 
-    int ret = ac.listen(p::base::EndPoint(argv[1]));
+    int ret = ac.listen(p::base::EndPoint("0.0.0.0", port));
 
     LOG_DEBUG << "listen ret=" << ret;
 

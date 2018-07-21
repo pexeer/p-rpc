@@ -10,19 +10,29 @@
 namespace p {
 namespace rpc {
 
+int Socket::send_eof() {
+    return 1;
+}
+
 int Socket::send_msg(base::ZBuffer&& zbuf, void* arg) {
+    LOG_DEBUG << this << " Socket send_msg len=" << zbuf.size();
     if (errno_) {
         return -1;
     }
+
+    bool no_pendding_msg = sending_queue_.empty();
 
     zbuf.dump(&sending_queue_);
 
     sending_queue_.push_back(base::ZBuffer::BlockRef{0, 0, (base::ZBuffer::Block*)arg});
 
-    on_msg_out();
+    if (no_pendding_msg) {
+        on_msg_out();
+    }
 
     return 0;
 }
+
 int Socket::try_connect(base::EndPoint peer) {
     assert(fd_ < 0);
     int err = SocketFd::Connect(peer);
@@ -34,7 +44,6 @@ int Socket::try_connect(base::EndPoint peer) {
         status_ = kConnecting;
         auto worker = p::rpc::AsyncWorker::current_worker();
         worker->insert_connect(this);
-        set_owner(worker);
     }
     return err;
 }
@@ -79,26 +88,23 @@ int Socket::set_failed(int err) {
         ac->release_connect(this);
     }
 
-    int ret = SocketFd::Shutdown();
-    if (ret) {
-        LOG_DEBUG << this << " Socket shutdown failed err=" << strerror(ret);
-    }
+    reset(-1);
 
     return 0;
 }
 
 void Socket::on_msg_in() {
-    if (status_ !=  kConnected) {
-        return ;
-    }
+    LOG_DEBUG << this << " Socket on_msg_in doing";
 
-    while (true) {
+    while (status_ == kConnected) {
         base::ZBuffer   zbuf;
 
-        ssize_t ret = zbuf.read_from_fd(fd_, -1, 16 * 1024);
+        ssize_t ret = zbuf.read_from_fd(fd_, -1, 32 * 1024);
 
         if (ret > 0) {
+            doing_on_msg_in_ = 1;
             on_msg_read(&zbuf);
+            doing_on_msg_in_ = 0;
             continue;
         }
 
@@ -107,16 +113,20 @@ void Socket::on_msg_in() {
                 break;
             }
             set_failed(errno);
+            return ;
         }
 
         LOG_DEBUG << this << " Socket set EOF";
         status_ = kReadedEOF;
+        doing_on_msg_in_ = 1;
         on_msg_read(nullptr);
-        break;
+        doing_on_msg_in_ = 0;
+        return ;
     }
 }
 
 void Socket::on_msg_out() {
+    LOG_DEBUG << this << " Socket on_msg_out doing";
     if (status_ == kConnecting) {
         int err = GetSocketErr();
         LOG_DEBUG << this << " Socket is connecting, get options, err=" << strerror(err);
@@ -130,24 +140,29 @@ void Socket::on_msg_out() {
         return ;
     }
 
-    if (status_ >= kConnecting) {
+    if (status_ == kShutdown) {
         return ;
     }
 
     while (!sending_queue_.empty()) {
         auto &ref = sending_queue_.front();
         if (ref.length == 0) {
-            on_msg_sended(0, (void*)ref.block);
             sending_queue_.pop_front();
+            doing_on_msg_out_ = 1;
+            on_msg_sended(0, (void*)ref.block);
+            doing_on_msg_out_ = 0;
             continue;
         }
 
         ssize_t ret = Write(ref.begin(), ref.length);
+
         if (ret > 0) {
+            writed_bytes_ += ret;
             if (ref.length == ret) {
                 ref.release();
                 sending_queue_.pop_front();
             } else {
+                ref.offset += ret;
                 ref.length -= ret;
             }
             continue;
@@ -155,9 +170,10 @@ void Socket::on_msg_out() {
 
         if (errno == EAGAIN || errno == EWOULDBLOCK) {
             // AGAIN
-            break;
+            return ;
         }
         set_failed(errno);
+        return ;
     }
 
     if (status_ == kDisconnecting) {

@@ -19,9 +19,7 @@ class Socket : public base::SocketFd {
 public:
     Socket() {}
 
-    virtual ~Socket() {
-        LOG_DEBUG << this << " Socket Free";
-    }
+    virtual ~Socket() {}
 
     void release() {
         if (1 == ref_.fetch_sub(1)) { //, std::memory_order_release);
@@ -51,6 +49,8 @@ public:
         return errno_;
     }
 
+    int send_eof();
+
     int send_msg(base::ZBuffer&& zbuf, void* arg);
 
     void stop_read() { status_ = kStopReading; }
@@ -58,7 +58,9 @@ public:
     void try_read() {
         if (status_ == kStopReading) {
             status_ = kConnected;
-            on_msg_in();
+            if (!doing_on_msg_in_) {
+                on_msg_in();
+            }
         }
     }
 
@@ -80,11 +82,15 @@ public:
 
     void set_remote_side(base::EndPoint peer) { remote_side_ = peer; }
 
+    bool connected() {
+        return status_ < kConnecting;
+    }
+
     static constexpr int kConnected     = 0;
     static constexpr int kStopReading   = 1;
     static constexpr int kReadedEOF     = 2;
-    static constexpr int kDisconnecting = 3;
-    static constexpr int kConnecting    = 4;
+    static constexpr int kConnecting    = 3;
+    static constexpr int kDisconnecting = 4;
     static constexpr int kShutdown      = 5;
 
     void set_status(int s) { status_ = s; }
@@ -102,12 +108,16 @@ protected:
     int errno_  = 0;
     int status_ = kShutdown;
 
+    int doing_on_msg_in_ = 0;
+    int doing_on_msg_out_ = 0;
+
     std::atomic<int64_t>                sending_lock_ = {0};
     std::deque<base::ZBuffer::BlockRef> sending_queue_;
 
     std::atomic<int64_t> ref_ = {1};
 
     void*               owner_ = nullptr;
+    uint32_t            writed_bytes_ = 0;
 };
 
 class SocketPtr {

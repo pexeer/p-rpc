@@ -25,9 +25,9 @@ public:
 
     Socket* accept();
 
-  void insert_connect(Socket* s);
+    void insert_connect(Socket* s);
 
-  void release_connect(Socket* s);
+    void release_connect(Socket* s);
 
 private:
     int stop();

@@ -100,6 +100,7 @@ void AsyncWorker::insert_message(AsyncMessage::Func func, void* object) {
 }
 
 void AsyncWorker::insert_connect(Socket* s) {
+    s->set_owner(this);
     add_socket(s, true);
     socket_map_.insert(s);
 }
@@ -111,6 +112,16 @@ void AsyncWorker::release_connect(Socket* s) {
     push_message(&Socket::release_socket, s);
 }
 
+#include <signal.h>
+
+class IgnoreSignalPipe {
+public:
+    IgnoreSignalPipe() {
+        struct sigaction act;
+        act.sa_handler = SIG_IGN;
+        sigaction(SIGPIPE, &act, NULL);
+    }
+} dummy_ignore_signal_pipe;
 
 } // end namespace rpc
 } // end namespace p

@@ -48,8 +48,10 @@ template <typename T, const int keyLen, const int ivLen> class Encrypter : publi
 public:
     Encrypter(CryptoPP::byte* key) {
         ::memcpy(key_, key, keyLen);
+
         CryptoPP::AutoSeededRandomPool prng;
         prng.GenerateBlock(ivbuf_, ivLen);
+
         enc_.SetKeyWithIV(key_, keyLen, ivbuf_, ivLen);
     }
 
@@ -83,7 +85,6 @@ public:
         }
 
         BuildKeyFromPassword(passwd, (char*)key_, keyLen);
-
         dec_.SetKeyWithIV(key_, keyLen, (const CryptoPP::byte*)ivbuf, ivLen);
 
         return ivLen;
@@ -116,10 +117,10 @@ typedef Decrypter<CryptoPP::Salsa20, 32, 8>                  DecrypterSalsa20_32
 StreamDecrypt* StreamDecrypt::get_one(int index) {
     switch (index) {
     case 0:
-        return new DecrypterAES_16_16();
+        return new DecrypterAES_32_16();
         break;
     case 1:
-        return new DecrypterAES_32_16();
+        return new DecrypterAES_16_16();
         break;
     case 2:
         return new DecrypterChaCha_32_8();

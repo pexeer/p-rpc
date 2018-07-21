@@ -42,7 +42,6 @@ Socket* Acceptor::accept() {
     ret->set_remote_side(base::EndPoint((struct sockaddr_in*)&new_addr));
     ret->set_status(Socket::kConnected);
 
-    ret->set_owner(this);
     insert_connect(ret);
 
     return ret;
@@ -55,6 +54,7 @@ void Acceptor::on_msg_in() {
 }
 
 void Acceptor::insert_connect(Socket* s) {
+    s->set_owner(this);
     worker_->add_socket(s, true);
     socket_map_.insert(s);
 }
