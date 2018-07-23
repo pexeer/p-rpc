@@ -27,7 +27,8 @@ public:
         }
     }
 
-    int Close();
+    // TODO
+    int try_close();
 
     base::EndPoint remote_side() const { return remote_side_; }
 
@@ -49,7 +50,7 @@ public:
         return errno_;
     }
 
-    int send_eof();
+    //int send_eof();
 
     int send_msg(base::ZBuffer&& zbuf, void* arg);
 
@@ -94,6 +95,7 @@ public:
     static constexpr int kShutdown      = 5;
 
     void set_status(int s) { status_ = s; }
+
     void set_owner(void* o) { owner_ = o;}
 
     static void release_socket(void* s) {

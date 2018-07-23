@@ -31,10 +31,10 @@ int64_t Poller::poll() {
     const int kMaxEventNum = 2048;
     struct epoll_event evts[kMaxEventNum];
 
-    LOG_INFO << this << " Poller epoll_wait begin";
+    LOG_DEBUG << this << " Poller epoll_wait begin";
     const int n = ::epoll_wait(poll_fd_, evts, kMaxEventNum, -1);
     int64_t wakeup_timestamp_us = base::gettimeofday_us();
-    LOG_INFO << this << " Poller epoll_wait return " << n;
+    LOG_DEBUG << this << " Poller epoll_wait return " << n;
 
     for (int i = 0; i< n; ++i) {
         Socket* s = (Socket*)(evts[i].data.u64);

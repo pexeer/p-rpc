@@ -2,27 +2,23 @@
 // Licensed under a BSD-style license that can be found in the LICENSE file.
 
 
-#include "p/rpc/socket.h"          // Socket
-#include "p/rpc/async_worker.h"     // AsyncWorker
+#include "p/rpc/socket.h"        // Socket
+#include "p/rpc/async_worker.h"  // AsyncWorker
 #include "p/rpc/acceptor.h"     // AsyncWorker
 #include <assert.h>
 
 namespace p {
 namespace rpc {
 
-int Socket::send_eof() {
-    return 1;
-}
-
 int Socket::send_msg(base::ZBuffer&& zbuf, void* arg) {
-    LOG_DEBUG << this << " Socket send_msg len=" << zbuf.size();
+    //LOG_DEBUG << this << " Socket send_msg len=" << zbuf.size();
     if (errno_) {
         return -1;
     }
 
     bool no_pendding_msg = sending_queue_.empty();
 
-    zbuf.dump(&sending_queue_);
+    zbuf.dump_refs_to(&sending_queue_);
 
     sending_queue_.push_back(base::ZBuffer::BlockRef{0, 0, (base::ZBuffer::Block*)arg});
 
@@ -54,9 +50,14 @@ int Socket::shutdown() {
     return 0;
 }
 
-int Socket::Close() {
+int Socket::try_close() {
     status_ = kDisconnecting;
     on_msg_out();
+    // TODO
+    // deal with the case
+    //      has many data to send
+    //      but recive EOF
+    // how to release this socket
     return 0;
 }
 
@@ -121,6 +122,8 @@ void Socket::on_msg_in() {
         doing_on_msg_in_ = 1;
         on_msg_read(nullptr);
         doing_on_msg_in_ = 0;
+
+        set_failed(EHOSTUNREACH);
         return ;
     }
 }
