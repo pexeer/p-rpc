@@ -10,21 +10,13 @@ public:
     }
 };
 
-void x(void* arg) {
-    LOG_DEBUG<< "message run chenzjiga " << (char*)arg;
-}
-
 int main(int argc, char* argv[]) {
-    //p::base::Log::set_ef_log_level(p::base::LogLevel::kTrace);
+    //p::base::Log::set_log_level(p::base::LogLevel::kTrace);
     //p::base::g_log_level = p::base::LogLevel::kFatal;
 
     p::rpc::AsyncWorker worker;
 
     ShadowAcceptor ac(&worker);
-
-    p::base::EndPoint test("ip.cn", 433);
-
-    LOG_DEBUG << "test is " << test;
 
     int port = 8333;
     if (argc >= 2) {
@@ -38,14 +30,6 @@ int main(int argc, char* argv[]) {
     worker.start();
 
     worker.join();
-
-
-    // worker.push_message(x, (void*)"asldjfsdfasd");
-    // sleep(1);
-    // LOG_DEBUG << "add a new message";
-    worker.push_message(x, (void*)"asldjfsdfasd");
-
-    LOG_DEBUG << "in_worker_thread " << worker.in_worker_thread();
 
     return 0;
 }

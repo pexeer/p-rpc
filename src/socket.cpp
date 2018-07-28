@@ -11,7 +11,7 @@ namespace p {
 namespace rpc {
 
 int Socket::send_msg(base::ZBuffer&& zbuf, void* arg) {
-    //LOG_DEBUG << this << " Socket send_msg len=" << zbuf.size();
+    LOG_DEBUG << this << " Socket send_msg len=" << zbuf.size();
     if (errno_) {
         return -1;
     }
