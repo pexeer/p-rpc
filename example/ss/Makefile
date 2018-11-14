@@ -6,11 +6,11 @@
 STD=-std=c++11
 WARNING=-Wall -Werror
 DEBUG=-g
-#OPT=-O2
+OPT=-O2
 BUILD_DIR ?= ./build
 SRC_DIRS ?= ./src
-CC=clang
-CXX=clang++
+#CC=clang
+#CXX=clang++
 ROOT_PATH=../../..
 
 SRCS := $(shell find $(SRC_DIRS) -name \*.cpp -or -name \*.c -or -name \*.S)

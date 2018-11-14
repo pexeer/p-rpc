@@ -100,13 +100,19 @@ void Socket::on_msg_in() {
     while (status_ == kConnected) {
         base::ZBuffer   zbuf;
 
-        ssize_t ret = zbuf.read_from_fd(fd_, -1, 32 * 1024);
+        constexpr ssize_t kMaxIOLen = 32 * 1024;
+        ssize_t ret = zbuf.read_from_fd(fd_, -1, kMaxIOLen);
 
         if (ret > 0) {
             doing_on_msg_in_ = 1;
             on_msg_read(&zbuf);
             doing_on_msg_in_ = 0;
-            continue;
+
+            if (ret == kMaxIOLen) {
+                continue;
+            }
+
+            break;
         }
 
         if (ret < 0) {
@@ -164,11 +170,12 @@ void Socket::on_msg_out() {
             if (ref.length == ret) {
                 ref.release();
                 sending_queue_.pop_front();
+                continue;
             } else {
                 ref.offset += ret;
                 ref.length -= ret;
+                return;
             }
-            continue;
         }
 
         if (errno == EAGAIN || errno == EWOULDBLOCK) {
