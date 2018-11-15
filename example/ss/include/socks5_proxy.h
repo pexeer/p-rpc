@@ -78,7 +78,7 @@ public:
 
         LOG_DEBUG << this << " Socks5Proxy method_num=" << (int)method_num << ",left=" << zbuf->size();
 
-        if (version != 5 || method_num != zbuf->size()) {
+        if ((int)version != 5 || (uint32_t)method_num != zbuf->size()) {
             set_failed(EPROTO);
             return ;
         }
@@ -167,7 +167,7 @@ public:
         } else {
             char host_len;
             zbuf->popn(&host_len, 1);
-            if (zbuf->size() < (host_len + 2)) {
+            if (zbuf->size() < ((uint32_t)host_len + 2)) {
                 set_failed(EPROTO);
                 return ;
             }
